@@ -9,7 +9,7 @@ Follow these steps to set up the environment:
 1. **Clone the Repository**  
    ```bash  
    git clone https://github.com/yourusername/FM4MiningSegmentation.git  
-   cd FM4MiningSegmentation  
+   cd fm4_mining_segmentation  
    ```  
 
 2. **Create a Conda Environment**  
