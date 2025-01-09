@@ -19,16 +19,9 @@ ghana_mining_bands = [
     "BLUE",
     "GREEN",
     "RED",
-    "VNIR_1",
-    "VNIR_2",
-    "VNIR_3",
-    "VNIR_4",
     "VNIR_5",
     "SWIR_1",
     "SWIR_2",
-    "VV",
-    "VH",
-    "DEM"
 ]
 
 #MEANS AND STDS FOR EACH BAND
@@ -36,31 +29,17 @@ means=[
         1473.81388377,
         1703.35249650,
         1696.67685941,
-        2105.88077538,
-        3133.47063806,
-        3543.17834759,
-        3677.26573009,
         3832.39764247,
         3156.11122121,
         2226.06822112,
-        -6.52798491,
-        -3.60578219,
-        192.83874697,
     ]
 stds=[
         223.43533204,
         285.53613398,
         413.82320306,
-        395.83356682,
-        312.48236897,
-        354.47004513,
-        397.92163014,
         389.61483882,
         451.49534791,
         468.26765909,
-        6.66565737,
-        3.96725815,
-        57.37162747,
     ]
 
 train_transform = A.Compose([
@@ -98,7 +77,7 @@ model_args = {
         "backbone":"prithvi_vit_100", # see smp_encoders.keys()
         'model': 'UperNetDecoder', # 'DeepLabV3', 'DeepLabV3Plus', 'FPN', 'Linknet', 'MAnet', 'PAN', 'PSPNet', 'Unet', 'UnetPlusPlus' 
         "bands": ghana_mining_bands,
-        "in_channels": 13,
+        "in_channels": 6,
         "num_classes": 2,
         "pretrained": True,
 }
@@ -119,7 +98,7 @@ task = SemanticSegmentationTask(
 datamodule.setup("fit")
 checkpoint_callback = ModelCheckpoint(monitor=task.monitor, save_top_k=1, save_last=True)
 early_stopping_callback = EarlyStopping(monitor=task.monitor, min_delta=0.00, patience=20)
-logger = TensorBoardLogger(save_dir='output', name='resnet50')
+logger = TensorBoardLogger(save_dir='output', name='prithvi')
 
 trainer = Trainer(
     devices=4, # Number of GPUs. Interactive mode recommended with 1 device
@@ -132,7 +111,7 @@ trainer = Trainer(
     ],
     logger=logger,
     max_epochs=100,
-    default_root_dir='output/resnet50',
+    default_root_dir='output/prithvi',
     log_every_n_steps=1,
     check_val_every_n_epoch=1
 )
