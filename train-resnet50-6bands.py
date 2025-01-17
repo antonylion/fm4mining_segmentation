@@ -4,7 +4,7 @@ import warnings
 from segmentation_models_pytorch.encoders import encoders as smp_encoders
 import rasterio
 import numpy as np
-from terratorch.models import PrithviModelFactory
+from terratorch.models import SMPModelFactory
 from terratorch.datamodules import GenericNonGeoSegmentationDataModule
 from terratorch.tasks import SemanticSegmentationTask
 from lightning.pytorch import Trainer
@@ -13,7 +13,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 import albumentations as A
 from albumentations.pytorch import ToTensorV2  # Optional if you want to convert images to tensors directly
 
-DATASET_PATH = '/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/terratorch_fasteo/GhanaMining'
+DATASET_PATH = '/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/terratorch_fasteo/GhanaMiningPrithvi'
 
 ghana_mining_bands = [
     "BLUE",
@@ -74,8 +74,9 @@ datamodule = GenericNonGeoSegmentationDataModule(
 )
 
 model_args = {
-        "backbone":"prithvi_vit_100", # see smp_encoders.keys()
-        'model': 'UperNetDecoder', # 'DeepLabV3', 'DeepLabV3Plus', 'FPN', 'Linknet', 'MAnet', 'PAN', 'PSPNet', 'Unet', 'UnetPlusPlus' 
+        "backbone":"resnet50", # see smp_encoders.keys()
+        #"encoder_weights": "imagenet", #commented as I train from scratch
+        'model': 'Unet', # 'DeepLabV3', 'DeepLabV3Plus', 'FPN', 'Linknet', 'MAnet', 'PAN', 'PSPNet', 'Unet', 'UnetPlusPlus' 
         "bands": ghana_mining_bands,
         "in_channels": 6,
         "num_classes": 2,
@@ -84,7 +85,7 @@ model_args = {
 
 task = SemanticSegmentationTask(
     model_args=model_args,
-    model_factory="PrithviModelFactory",
+    model_factory="SMPModelFactory",
     loss="ce",
     lr=1e-4,
     ignore_index=-1,
@@ -98,7 +99,7 @@ task = SemanticSegmentationTask(
 datamodule.setup("fit")
 checkpoint_callback = ModelCheckpoint(monitor=task.monitor, save_top_k=1, save_last=True)
 early_stopping_callback = EarlyStopping(monitor=task.monitor, min_delta=0.00, patience=20)
-logger = TensorBoardLogger(save_dir='output', name='prithvi')
+logger = TensorBoardLogger(save_dir='output-scratch-6bands', name='resnet50-scratch-6bands')
 
 trainer = Trainer(
     devices=4, # Number of GPUs. Interactive mode recommended with 1 device
@@ -111,7 +112,7 @@ trainer = Trainer(
     ],
     logger=logger,
     max_epochs=100,
-    default_root_dir='output/prithvi',
+    default_root_dir='output-scratch-6bands/resnet50-scratch-6bands',
     log_every_n_steps=1,
     check_val_every_n_epoch=1
 )

@@ -6,61 +6,79 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 import rasterio
 import csv
-import torch.nn as nn
 
-# Create data and test_data according to train_test_split.csv
+# Paths to the images and masks directories
+images_dir = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/sam2_fasteo/GhanaMining3bands_final/train_imgs"
+masks_dir = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/sam2_fasteo/GhanaMining3bands_final/train_masks"
 
-# Define the directories
-data_dir = '/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/terratorch_fasteo/GhanaMiningRGB-SAM2/'
-image_dir = data_dir + "IMAGE_RGB/"
-mask_dir = data_dir + "MASK/"
-num_epochs = 100
-
-# Initialize lists for training and testing data
+# List to hold the image and mask pairs
 data = []
+
+## DATA
+
+
+# Get sorted lists of image and mask file names
+image_files = sorted(f for f in os.listdir(images_dir) if f.endswith("_IMG.tif"))
+mask_files = sorted(f for f in os.listdir(masks_dir) if f.endswith("_MASK.tif"))
+
+# Ensure the image and mask filenames align properly
+for img_file in image_files:
+    # Generate the corresponding mask file name
+    mask_file = img_file.replace("_IMG.tif", "_MASK.tif")
+    
+    # Check if the corresponding mask exists
+    if mask_file in mask_files:
+        # Create full paths for the image and mask
+        image_path = os.path.join(images_dir, img_file)
+        mask_path = os.path.join(masks_dir, mask_file)
+        
+        # Append to the data list
+        data.append({"image": image_path, "annotation": mask_path})
+    else:
+        print(f"Warning: No corresponding mask for image {img_file}")
+
+
+## TEST_DATA
+
+images_dir = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/sam2_fasteo/GhanaMining3bands_final/val_imgs"
+masks_dir = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/sam2_fasteo/GhanaMining3bands_final/val_masks"
+
+# List to hold the image and mask pairs
 test_data = []
 
-# Read the CSV file
-csv_file = '/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/terratorch_fasteo/train_test_splits.csv'
-split_info = {}  # Dictionary to store the train/test split information
+# Get sorted lists of image and mask file names
+image_files = sorted(f for f in os.listdir(images_dir) if f.endswith("_IMG.tif"))
+mask_files = sorted(f for f in os.listdir(masks_dir) if f.endswith("_MASK.tif"))
 
-with open(csv_file, mode='r') as file:
-    reader = csv.DictReader(file)
-    for row in reader:
-        split_info[row['patch_name']] = row['split']  # Store the patch_name and split ('train' or 'test')
+# Ensure the image and mask filenames align properly
+for img_file in image_files:
+    # Generate the corresponding mask file name
+    mask_file = img_file.replace("_IMG.tif", "_MASK.tif")
+    
+    # Check if the corresponding mask exists
+    if mask_file in mask_files:
+        # Create full paths for the image and mask
+        image_path = os.path.join(images_dir, img_file)
+        mask_path = os.path.join(masks_dir, mask_file)
+        
+        # Append to the data list
+        test_data.append({"image": image_path, "annotation": mask_path})
+    else:
+        print(f"Warning: No corresponding mask for image {img_file}")
 
-# Iterate over the images in the IMAGE folder
-for ff, name in enumerate(os.listdir(image_dir)):
-    mask_name = 'MASK' + name[3:]
-    if mask_name in split_info:
-        if split_info[mask_name] == 'train':
-            data.append({"image": image_dir + name, "annotation": mask_dir + mask_name})
-        elif split_info[mask_name] == 'test':
-            test_data.append({"image": image_dir + name, "annotation": mask_dir + mask_name})
+
 
 print("Len(data)")
 print(len(data))
 print("Len(test_data)")
 print(len(test_data))
 
+NUM_EPOCHS = 10
+
 def read_batch_test(data):
     ent  = data[np.random.randint(len(data))]
-    min_vals = np.array([1065.0, 1097.0, 908.0])  # Per band minimum values
-    max_vals = np.array([13496.0, 13528.0, 55537.0])  # Per band maximum values
     with rasterio.open(ent["image"]) as src:
         Img = np.dstack([src.read(1), src.read(2), src.read(3)])
-        # Normalize each channel to [0, 1]
-        Img = (Img - min_vals) / (max_vals - min_vals)
-        # Scale to [0, 255] and clip
-        Img = np.clip(Img * 255, 0, 255).astype(np.uint8)
-
-        # Linear contrast stretching for each band
-        Img = np.zeros_like(Img, dtype=np.uint8)
-        for band in range(Img.shape[2]):  # Iterate over each channel (R, G, B)
-            band_data = Img[:, :, band]
-            band_min = band_data.min()
-            band_max = band_data.max()
-            Img[:, :, band] = ((band_data - band_min) / (band_max - band_min + 1e-10) * 255).astype(np.uint8)
     with rasterio.open(ent["annotation"]) as src:
         ann_map = src.read(1)
     inds = np.unique(ann_map)
@@ -76,23 +94,8 @@ def read_batch_test(data):
 
 def read_batch(data, idx):
     ent  = data[idx]
-    min_vals = np.array([1065.0, 1097.0, 908.0])  # Per band minimum values
-    max_vals = np.array([13496.0, 13528.0, 55537.0])  # Per band maximum values
     with rasterio.open(ent["image"]) as src:
         Img = np.dstack([src.read(1), src.read(2), src.read(3)])
-        # Normalize each channel to [0, 1]
-        Img = (Img - min_vals) / (max_vals - min_vals)
-        # Scale to [0, 255] and clip
-        Img = np.clip(Img * 255, 0, 255).astype(np.uint8)
-
-        # Linear contrast stretching for each band
-        Img = np.zeros_like(Img, dtype=np.uint8)
-        for band in range(Img.shape[2]):  # Iterate over each channel (R, G, B)
-            band_data = Img[:, :, band]
-            band_min = band_data.min()
-            band_max = band_data.max()
-            Img[:, :, band] = ((band_data - band_min) / (band_max - band_min) * 255).astype(np.uint8)
-
     with rasterio.open(ent["annotation"]) as src:
         ann_map = src.read(1)
     inds = np.unique(ann_map)
@@ -107,11 +110,10 @@ def read_batch(data, idx):
     return Img, np.array(masks), np.array(points), np.ones([len(masks), 1])
 
 # Load model
-sam2_checkpoint = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/fasteo/segment-anything-2/checkpoints/sam2_hiera_small.pt"
+sam2_checkpoint = "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0016/segment-anything-2/checkpoints/sam2_hiera_small.pt"
 model_cfg = "sam2_hiera_s.yaml"
 sam2_model = build_sam2(model_cfg, sam2_checkpoint, device="cuda")
-sam2_model = nn.DataParallel(sam2_model)  # Wrap the model to utilize multiple GPUs
-predictor = SAM2ImagePredictor(sam2_model.module)
+predictor = SAM2ImagePredictor(sam2_model)
 
 # Set training parameters
 predictor.model.sam_mask_decoder.train(True)
@@ -165,7 +167,7 @@ def evaluate_model(test_data):
     return total_iou / count if count > 0 else 0  # Return the average IoU
 
 # Training loop
-for itr in range(num_epochs * len(data)): #2967: all training images (len(data)), N * len(data) = N epochs
+for itr in range(NUM_EPOCHS * len(data)): #2967: all training images (len(data)), N * len(data) = N epochs
     with torch.cuda.amp.autocast():
         image, mask, input_point, input_label = read_batch(data, (itr % len(data))) #previously -> np.random.randint(len(data))
         if mask.shape[0] == 0: continue
@@ -202,7 +204,7 @@ for itr in range(num_epochs * len(data)): #2967: all training images (len(data))
         print(f"Step: {itr}, Training Accuracy (IoU): {mean_iou}")
 
 # Evaluate on test data every 1000 iterations
-torch.save(predictor.model.state_dict(), "model_cocoa_100epochs.torch")
+torch.save(predictor.model.state_dict(), "model_cocoa_10epochs.torch")
 print("Model saved at end of training")
 test_iou = evaluate_model(test_data)
-print(f"Test Accuracy (IoU) at iteration {itr} (100 epochs): {test_iou}")
+print(f"Test Accuracy (IoU) at iteration {itr} (10 epochs): {test_iou}")
